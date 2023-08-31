@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+	<title>LiTeX</title>
+	<style>
+		@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Roboto:ital,wght@0,400;0,500;1,400&display=swap');
+		:root {
+			color-scheme: light dark;
+		}
+		a, a:visited {
+			color: blue;
+		}
+		body {
+			display: flex;
+			flex-direction: column;
+			font-family: Inter, sans-serif;
+			margin: 0;
+			min-height: 100vh;
+		}
+		header, main {
+			margin: 10px;
+		}
+		main {
+			flex: 1; /* Make main take up all available space */
+		}
+		textarea {
+			box-sizing: border-box;
+			width: 100%;
+		}
+		button, input {
+			padding: 5px 10px;
+			border: 1px solid;
+			border-radius: 0.25rem;
+		}
+		button {
+			cursor: pointer;
+		}
+		div.input-output {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 5px;
+		}
+		footer {
+			margin-top: 20px;
+			padding: 20px;
+		}
+		footer, footer a, footer a:visited {
+			background-color: #007de1;
+			color: white;
+		}
+
+		/* Make the output iframe take up two columns */
+		section:nth-child(3) {
+			grid-column: 1 / 3;
+		}
+
+		/* Resizable iframe, see https://stackoverflow.com/a/60803488/14350146 */
+		.resizer {
+			display: flex;
+			resize: both;
+			overflow: hidden;
+		}
+		.resizer > * {
+			flex-grow: 1;
+		}
+	</style>
+</head>
+<body>
+	<header>
+		<h1>LiTeX</h1>
+	</header>
+
+	<main>
+	<label for="title">Title</label>
+	<input id="title" type="text" value="LiTeX: LaTeX alternative"></input>
+
+	<p>
+		<button onclick="fullPreview()">Full-site preview</button>
+		<button onclick="printOutput()">Save as PDF / Print</button>
+	</p>
+
+	<p>
+		<label for="file">Upload a file to edit</label>
+		<input type="file" id="file" onchange="uploadFiles()"></input>
+	</p>
+
+	<br>
+		<div class="input-output">
+			<section>
+				<label for="md">Markdown</label><br>
+				<textarea id="md" rows="20">
+# Document
+
+[LiTeX](https://linuskmr.github.io/linuskmr) is a LaTeX alternative. It _creates_ a PDF from a **markdown** file and a CSS stylesheet.
+
+## Table
+
+| Column 1 | Column 2 |
+| -------- | -------- |
+| Row 1    | Row 1    |
+| Row 2    | Row 2    |
+				</textarea>
+			</section>
+
+			<section>
+				<label for="css">CSS</label><br>
+				<textarea id="css" rows="20">
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Roboto:ital,wght@0,400;0,500;1,400&display=swap');
+
+:root {
+	color-scheme: light dark;
+}
+
+body {
+	font-family: Inter, sans-serif;
+}
+
+a, a:visited {
+	color: blue;
+}
+
+table, td, th {
+	border: 1px solid;
+	border-collapse: collapse;
+	padding: 5px;
+}
+				</textarea>
+			</section>
+
+			<section>
+				<label for="html">Output</label>
+				<div class="resizer">
+					<iframe id="html" width="100%" height="300px"></iframe>
+				</div>
+			</section>
+		</div>
+	</main>
+
+	<footer>
+		LiTeX &copy; linuskmr &middot; AGPL-3.0<br>
+		<a href="https://github.com/linuskmr/litex">Sourcecode</a>
+	</footer>
+</body>
+
+<script>
+const md = document.querySelector('#md')
+const css = document.querySelector('#css')
+const html = document.querySelector('#html')
+const title = document.querySelector('#title')
+
+const renderMdToHtml = () => {
+	const genericHeader = `<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">`
+	const titleHtml = `<title>${title.value}</title>`
+	const style = `<style>${css.value}</style>`
+	html.contentDocument.head.innerHTML = genericHeader + titleHtml + style
+	html.contentDocument.body.innerHTML = marked.parse(md.value)
+}
+
+// Update HTML output on keyup
+md.addEventListener('keyup', renderMdToHtml)
+css.addEventListener('keyup', renderMdToHtml)
+title.addEventListener('keyup', renderMdToHtml)
+
+// Initial rendering
+window.onload = renderMdToHtml
+
+
+function fullPreview() {
+	const printHtml = html.contentDocument.documentElement.outerHTML.toString()
+	const blobUrl = URL.createObjectURL(new Blob([printHtml], {type: 'text/html'}))
+	window.open(blobUrl)
+}
+
+ 
+/**
+ * Print the output html iframe.
+ * @see https://developer.mozilla.org/en-US/docs/Web/Guide/Printing#print_an_external_page_without_opening_it
+ */
+function printOutput() {
+	function closePrint() {
+		document.body.removeChild(this.__container__)
+	}
+
+	function setPrint() {
+		this.contentWindow.__container__ = this;
+		this.contentWindow.onbeforeunload = closePrint;
+		this.contentWindow.onafterprint = closePrint;
+		this.contentWindow.focus(); // Required for IE
+		this.contentWindow.print();
+	}
+
+	// Create iframe to print
+	const hiddenFrame = document.createElement("iframe")
+
+	// Create blob url from html and set iframe src to blob url
+	const printHtml = html.contentDocument.documentElement.outerHTML.toString()
+	const blobUrl = URL.createObjectURL(new Blob([printHtml], {type: 'text/html'}))
+	hiddenFrame.src = blobUrl
+
+	// Invoke window.print() after iframe has loaded, and set onafterprint
+	hiddenFrame.onload = setPrint
+
+	// Hide iframe
+	hiddenFrame.style.position = "fixed"
+	hiddenFrame.style.right = "0"
+	hiddenFrame.style.bottom = "0"
+	hiddenFrame.style.width = "0"
+	hiddenFrame.style.height = "0"
+	hiddenFrame.style.border = "0"
+
+	document.body.appendChild(hiddenFrame)
+}
+
+
+
+
+async function uploadFiles() {
+	const fileUpload = document.getElementById("file")
+	for (const file of fileUpload.files) {
+		// Read the file data by creating a blob and fetching it
+		const fileUrl = URL.createObjectURL(file)
+		const fetchResponse = await fetch(fileUrl)
+		const fileData = await fetchResponse.text()
+		
+		// Set the file data as markdown or css depending on file extension
+		if (file.name.endsWith(".md")) {
+			md.value = fileData
+		} else if (file.name.endsWith(".css")) {
+			css.value = fileData
+		} else {
+			alert(`File '${file.name}' doesn't end with .md or .css. This file is not uploaded.`)
+		}
+	}
+	renderMdToHtml()
+	fileUpload.value = null
+}
+</script>
+
+</html>
